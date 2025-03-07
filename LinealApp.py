@@ -2,13 +2,14 @@ import sys
 import pulp
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
+from module_simplex import SimplexTable  # Importar el módulo simplex
 
 class LinearProgrammingApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Programación Lineal con Tkinter y PuLP")
-        self.root.geometry("600x400")
-
+        self.root.geometry("800x600")
+        self.root.resizable(False, False)  # Deshabilitar las dimensiones de redimensionamiento
         self.layout = tk.Frame(self.root)
         self.layout.pack(padx=10, pady=10)
 
@@ -24,6 +25,7 @@ class LinearProgrammingApp:
         self.restricciones_input = scrolledtext.ScrolledText(self.layout, width=50, height=10)
         self.restricciones_input.pack()
 
+        # Botón para calcular con diseño de Tkinter con redondeo
         self.calcular_button = tk.Button(self.layout, text="Calcular", command=self.calcular)
         self.calcular_button.pack(pady=10)
 
@@ -61,6 +63,8 @@ class LinearProgrammingApp:
             prob += pulp.lpSum([c[i] * x[i] for i in range(len(c))])
 
             # Definir las restricciones
+            A = []
+            b = []
             for restriccion in restricciones:
                 if not restriccion.strip():
                     continue  # Ignorar líneas vacías
@@ -76,10 +80,16 @@ class LinearProgrammingApp:
                 # Agregar la restricción al problema
                 if operador == "<=":
                     prob += pulp.lpSum([coeficientes[i] * x[i] for i in range(len(coeficientes))]) <= valor
+                    A.append(coeficientes)
+                    b.append(valor)
                 elif operador == ">=":
                     prob += pulp.lpSum([coeficientes[i] * x[i] for i in range(len(coeficientes))]) >= valor
+                    A.append([-coef for coef in coeficientes])
+                    b.append(-valor)
                 elif operador == "=":
                     prob += pulp.lpSum([coeficientes[i] * x[i] for i in range(len(coeficientes))]) == valor
+                    A.append(coeficientes)
+                    b.append(valor)
                 else:
                     raise ValueError(f"Operador no válido en la restricción: {restriccion}")
 
@@ -94,15 +104,10 @@ class LinearProgrammingApp:
             for v in prob.variables():
                 self.resultado_output.insert(tk.END, f"{v.name} = {v.varValue}\n")
 
-            # Almacenar la tabla final (en este caso, el estado del problema)
-            self.tabla_final = f"Estado: {pulp.LpStatus[prob.status]}\n"
-            self.tabla_final += f"Valor óptimo: {pulp.value(prob.objective)}\n"
-            self.tabla_final += "Variables:\n"
-            for v in prob.variables():
-                self.tabla_final += f"{v.name} = {v.varValue}\n"
-            self.tabla_final += "Restricciones:\n"
-            for name, constraint in prob.constraints.items():
-                self.tabla_final += f"{name}: {constraint}\n"
+            # Crear la tabla simplex
+            simplex_table = SimplexTable(c, A, b)
+            simplex_table.solve()
+            self.tabla_final = simplex_table  # Asignar la tabla final
 
             # Habilitar el botón para mostrar la tabla final
             self.mostrar_tabla_button.config(state=tk.NORMAL)
@@ -120,12 +125,12 @@ class LinearProgrammingApp:
         # Crear una nueva ventana modal para mostrar la tabla final
         tabla_window = tk.Toplevel(self.root)
         tabla_window.title("Tabla Final")
-        tabla_window.geometry("500x400")
+        tabla_window.geometry("600x400")
 
         # Agregar un widget de texto para mostrar la tabla
-        tabla_text = scrolledtext.ScrolledText(tabla_window, width=60, height=20)
+        tabla_text = scrolledtext.ScrolledText(tabla_window, width=80, height=20)
         tabla_text.pack(padx=10, pady=10)
-        tabla_text.insert(tk.END, self.tabla_final)
+        tabla_text.insert(tk.END, self.tabla_final.format_table())  # Usar format_table
         tabla_text.config(state=tk.DISABLED)  # Hacer el texto de solo lectura
 
         # Botón para cerrar la ventana
